@@ -72,30 +72,53 @@ defmodule YtdWeb.HomeLive do
           <% end %>
 
           <%= if @formats do %>
-            <div class="mt-6 space-y-4">
-              <h2 class="text-lg font-medium text-gray-900">Available Formats</h2>
-              <%= for format <- @formats do %>
-                <div class="border rounded-lg p-4 hover:bg-gray-50">
-                  <button
-                    phx-click="select_format"
-                    phx-value-id={format.id}
-                    phx-value-ext={format.ext}
-                    class="w-full text-left"
-                  >
-                    <div class="flex justify-between items-center">
-                      <div>
-                        <p class="font-medium text-gray-900">
-                          <%= format.quality %> <%= format.type %>
-                        </p>
-                        <p class="text-sm text-gray-500">
-                          <%= format.size %>
-                        </p>
+            <div class="mt-6">
+              <div :if={hd(@formats).thumbnail} class="mb-6">
+                <img
+                  src={hd(@formats).thumbnail}
+                  alt={hd(@formats).title}
+                  class="w-full h-48 object-cover rounded-lg shadow-md"
+                />
+                <h2 class="mt-2 text-lg font-medium text-gray-900">
+                  <%= hd(@formats).title %>
+                </h2>
+              </div>
+
+              <h3 class="text-lg font-medium text-gray-900 mb-4">Available Formats</h3>
+              <div class="space-y-4">
+                <%= for format <- @formats do %>
+                  <div class="border rounded-lg p-4 hover:bg-gray-50">
+                    <button
+                      phx-click="select_format"
+                      phx-value-id={format.id}
+                      class="w-full text-left"
+                    >
+                      <div class="flex justify-between items-center">
+                        <div>
+                          <div class="flex items-center">
+                            <%= if format.is_audio do %>
+                              <svg class="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                              </svg>
+                            <% else %>
+                              <svg class="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                            <% end %>
+                            <p class="font-medium text-gray-900">
+                              <%= format.quality %> <%= format.type %>
+                            </p>
+                          </div>
+                          <p class="text-sm text-gray-500 mt-1">
+                            <%= format.size %>
+                          </p>
+                        </div>
+                        <span class="text-indigo-600 text-sm">Download</span>
                       </div>
-                      <span class="text-indigo-600 text-sm">Download</span>
-                    </div>
-                  </button>
-                </div>
-              <% end %>
+                    </button>
+                  </div>
+                <% end %>
+              </div>
             </div>
           <% end %>
 

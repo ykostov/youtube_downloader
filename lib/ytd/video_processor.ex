@@ -29,12 +29,8 @@ defmodule Ytd.VideoProcessor do
   def handle_call({:get_formats, url}, _from, state) do
     case System.cmd(@youtube_dl_cmd, ["--dump-json", url]) do
       {output, 0} ->
-        formats =
-          output
-          |> Jason.decode!()
-          |> Map.get("formats")
-          |> process_formats()
-
+        video_json = Jason.decode!(output)
+        formats = process_formats(video_json)
         {:reply, {:ok, formats}, state}
 
       {error, _} ->
@@ -220,10 +216,12 @@ defmodule Ytd.VideoProcessor do
   end
 
 
-  defp process_formats(formats) do
+  defp process_formats(video_json) do
+    formats = video_json["formats"]
+
     formats
     |> Enum.filter(&filter_format/1)
-    |> Enum.map(&format_info/1)
+    |> Enum.map(&format_info(&1, video_json))
     |> Enum.sort_by(& &1.quality_index, :desc)
     |> select_best_formats()
   end
@@ -236,12 +234,12 @@ defmodule Ytd.VideoProcessor do
     has_video || has_audio
   end
 
-  defp format_info(format) do
+  defp format_info(format, video_info) do
     type =
       cond do
         format["vcodec"] != "none" && format["acodec"] != "none" -> "Video"
         format["vcodec"] != "none" -> "Video"
-        format["acodec"] != "none" -> "Audio MP3"  # Changed label
+        format["acodec"] != "none" -> "Audio MP3"
       end
 
     quality =
@@ -262,8 +260,10 @@ defmodule Ytd.VideoProcessor do
       quality: quality,
       quality_index: quality_index,
       size: format_size(format["filesize"] || 0),
-      ext: "mp3",  # Force mp3 for audio
-      is_audio: type == "Audio MP3"  # Add flag for audio
+      ext: if(type == "Audio MP3", do: "mp3", else: "mp4"),
+      is_audio: type == "Audio MP3",
+      thumbnail: video_info["thumbnail"],
+      title: video_info["title"]
     }
   end
 
