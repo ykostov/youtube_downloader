@@ -53,7 +53,24 @@ defmodule Ytd.VideoProcessor do
     File.mkdir_p!(download_dir)
 
     Task.start(fn ->
-      try do
+      # try do
+      #   port = Porcelain.spawn(@youtube_dl_cmd, [
+      #     "-f",
+      #     format_id,
+      #     "-o",
+      #     Path.join(download_dir, "%(title)s.%(ext)s"),
+      #     "--newline",
+      #     "--progress",
+      #     url
+      #   ], out: {:send, self()})
+
+      #   monitor_download(port, pid, download_id, download_dir)
+      # catch
+      #   kind, error ->
+      #     Logger.error("Download failed: #{inspect(kind)} - #{inspect(error)}")
+      #     send(pid, {:download_error, "Download failed: Please try again"})
+      # end
+
         port = Porcelain.spawn(@youtube_dl_cmd, [
           "-f",
           format_id,
@@ -65,11 +82,7 @@ defmodule Ytd.VideoProcessor do
         ], out: {:send, self()})
 
         monitor_download(port, pid, download_id, download_dir)
-      catch
-        kind, error ->
-          Logger.error("Download failed: #{inspect(kind)} - #{inspect(error)}")
-          send(pid, {:download_error, "Download failed: Please try again"})
-      end
+
     end)
 
     new_downloads = Map.put(state.downloads, download_id, %{
@@ -164,7 +177,15 @@ defmodule Ytd.VideoProcessor do
     dir
     |> File.ls!()
     |> Enum.map(&Path.join(dir, &1))
-    |> Enum.sort_by(&File.stat!(&1).mtime, {:desc, DateTime})
+    |> Enum.sort_by(
+      fn file ->
+        stat = File.stat!(file)
+        # Convert Erlang datetime tuple to Unix timestamp for comparison
+        calendar = stat.mtime
+        :calendar.datetime_to_gregorian_seconds(calendar)
+      end,
+      :desc
+    )
     |> List.first()
   end
 
