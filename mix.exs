@@ -58,7 +58,10 @@ defmodule Ytd.MixProject do
       {:gettext, "~> 0.20"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.1.1"},
-      {:bandit, "~> 1.5"}
+      {:porcelain, "~> 2.0"}, # For running youtube-dl commands
+      {:ex_rated, "~> 2.1"}, # For rate limiting
+      {:bandit, "~> 1.0"}
+
     ]
   end
 

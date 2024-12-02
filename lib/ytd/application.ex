@@ -16,6 +16,7 @@ defmodule Ytd.Application do
       {Finch, name: Ytd.Finch},
       # Start a worker by calling: Ytd.Worker.start_link(arg)
       # {Ytd.Worker, arg},
+      Ytd.VideoProcessor,
       # Start to serve requests, typically the last entry
       YtdWeb.Endpoint
     ]

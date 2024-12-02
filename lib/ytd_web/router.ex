@@ -17,7 +17,10 @@ defmodule YtdWeb.Router do
   scope "/", YtdWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    # get "/", PageController, :home
+    live "/", HomeLive
+    # Route for handling download completion
+    get "/downloads/:filename", DownloadController, :download
   end
 
   # Other scopes may use custom stacks.
