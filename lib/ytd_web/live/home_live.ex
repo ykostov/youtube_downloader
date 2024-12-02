@@ -19,7 +19,8 @@ defmodule YtdWeb.HomeLive do
        download_progress: 0,
        download_path: nil,
        show_directory_picker: false,
-       downloads_dir: downloads_dir
+       downloads_dir: downloads_dir,
+       loading_formats: false
      )}
   end
 
@@ -33,7 +34,6 @@ defmodule YtdWeb.HomeLive do
         </h1>
 
         <div class="bg-white shadow rounded-lg p-6">
-          <!-- URL input form remains the same -->
           <form phx-submit="fetch_formats" class="space-y-4">
             <div>
               <label for="url" class="block text-sm font-medium text-gray-700">
@@ -56,8 +56,19 @@ defmodule YtdWeb.HomeLive do
             <button
               type="submit"
               class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              disabled={@loading_formats}
             >
-              Fetch Formats
+              <%= if @loading_formats do %>
+                <div class="flex items-center">
+                  <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Fetching formats...
+                </div>
+              <% else %>
+                Fetch Formats
+              <% end %>
             </button>
           </form>
 
@@ -71,7 +82,29 @@ defmodule YtdWeb.HomeLive do
             </div>
           <% end %>
 
-          <%= if @formats do %>
+          <%= if @loading_formats do %>
+            <div class="mt-6 space-y-4">
+              <div class="animate-pulse">
+                <div class="h-48 bg-gray-200 rounded-lg w-full mb-4"></div>
+                <div class="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
+                <div class="space-y-3">
+                  <%= for _ <- 1..2 do %>
+                    <div class="border rounded-lg p-4">
+                      <div class="flex justify-between items-center">
+                        <div class="space-y-2">
+                          <div class="h-4 bg-gray-200 rounded w-24"></div>
+                          <div class="h-3 bg-gray-200 rounded w-16"></div>
+                        </div>
+                        <div class="h-4 bg-gray-200 rounded w-16"></div>
+                      </div>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+          <% end %>
+
+          <%= if @formats && !@loading_formats do %>
             <div class="mt-6">
               <div :if={hd(@formats).thumbnail} class="mb-6">
                 <img
@@ -200,14 +233,38 @@ defmodule YtdWeb.HomeLive do
   end
 
   @impl true
-  def handle_event("fetch_formats", %{"url" => url}, socket) do
-    case VideoProcessor.get_formats(url) do
-      {:ok, formats} ->
-        {:noreply, assign(socket, formats: formats, error: nil)}
+def handle_event("fetch_formats", %{"url" => url}, socket) do
+  # Set loading state
+  socket = assign(socket, loading_formats: true, formats: nil, error: nil)
 
-      {:error, message} ->
-        {:noreply, assign(socket, error: message, formats: nil)}
-    end
+  # Start async task for fetching
+  Process.send_after(self(), {:fetch_formats, url}, 0)
+
+  # Return immediately with loading state
+  {:noreply, socket}
+end
+
+# Add handlers for the fetch process
+@impl true
+def handle_info({:fetch_formats, url}, socket) do
+  case VideoProcessor.get_formats(url) do
+    {:ok, formats} ->
+      {:noreply, assign(socket, formats: formats, error: nil, loading_formats: false)}
+
+    {:error, message} ->
+      {:noreply, assign(socket, error: message, formats: nil, loading_formats: false)}
+  end
+end
+
+  # Add this handler for the formats fetched message
+  @impl true
+  def handle_info({:formats_fetched, {:ok, formats}}, socket) do
+    {:noreply, assign(socket, formats: formats, error: nil, loading_formats: false)}
+  end
+
+  @impl true
+  def handle_info({:formats_fetched, {:error, message}}, socket) do
+    {:noreply, assign(socket, error: message, formats: nil, loading_formats: false)}
   end
 
   @impl true
