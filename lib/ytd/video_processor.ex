@@ -54,13 +54,17 @@ defmodule Ytd.VideoProcessor do
 
     Task.start(fn ->
       try do
+        format_arg = if String.contains?(format_id, "+bestaudio"), do: format_id, else: "#{format_id}+bestaudio"
+        output_template = Path.join(download_dir, "%(title)s.mp4") # Force .mp4 extension
+
         port = Porcelain.spawn(@youtube_dl_cmd, [
           "-f",
-          format_id,
+          format_arg,
           "-o",
-          Path.join(download_dir, "%(title)s.%(ext)s"),
+          output_template,
           "--newline",
           "--progress",
+          "--merge-output-format", "mp4",
           url
         ], out: {:send, self()})
 
@@ -70,7 +74,6 @@ defmodule Ytd.VideoProcessor do
           Logger.error("Download failed: #{inspect(kind)} - #{inspect(error)}")
           send(pid, {:download_error, "Download failed: Please try again"})
       end
-
     end)
 
     new_downloads = Map.put(state.downloads, download_id, %{
@@ -84,6 +87,7 @@ defmodule Ytd.VideoProcessor do
 
     {:noreply, %{state | downloads: new_downloads}}
   end
+
 
   @impl true
   def handle_info({:download_update, download_id, progress}, state) do
@@ -121,16 +125,27 @@ defmodule Ytd.VideoProcessor do
             monitor_download(port, client_pid, download_id, download_dir)
 
           :complete ->
-            filepath = find_latest_download(download_dir)
-            send(client_pid, {:download_complete, filepath})
+            case find_latest_download(download_dir) do
+              nil ->
+                send(client_pid, {:download_error, "Could not find downloaded file"})
+              filepath ->
+                # Here's where we ensure we get just the final filename
+                filename = Path.basename(filepath)
+                send(client_pid, {:download_complete, filename})
+            end
 
           _ ->
             monitor_download(port, client_pid, download_id, download_dir)
         end
 
       {_, :result, %{status: 0}} ->
-        filepath = find_latest_download(download_dir)
-        send(client_pid, {:download_complete, filepath})
+        case find_latest_download(download_dir) do
+          nil ->
+            send(client_pid, {:download_error, "Could not find downloaded file"})
+          filepath ->
+            filename = Path.basename(filepath)
+            send(client_pid, {:download_complete, filename})
+        end
 
       {_, :result, %{status: status}} ->
         send(client_pid, {:download_error, "Download failed with status #{status}"})
@@ -162,20 +177,21 @@ defmodule Ytd.VideoProcessor do
   end
 
   defp find_latest_download(dir) do
-    dir
-    |> File.ls!()
-    |> Enum.map(&Path.join(dir, &1))
-    |> Enum.sort_by(
-      fn file ->
-        stat = File.stat!(file)
-        # Convert Erlang datetime tuple to Unix timestamp for comparison
-        calendar = stat.mtime
-        :calendar.datetime_to_gregorian_seconds(calendar)
-      end,
-      :desc
-    )
-    |> List.first()
+    case File.ls!(dir) do
+      [] -> nil
+      files ->
+        files
+        |> Enum.map(&Path.join(dir, &1))
+        |> Enum.sort_by(fn file ->
+          case File.stat(file) do
+            {:ok, stat} -> stat.mtime
+            {:error, _} -> {{1970,1,1},{0,0,0}}
+          end
+        end, :desc)
+        |> List.first()
+    end
   end
+
 
   defp process_formats(formats) do
     formats
@@ -186,15 +202,21 @@ defmodule Ytd.VideoProcessor do
   end
 
   defp filter_format(format) do
-    # Filter out formats we don't want
-    format["vcodec"] != "none" || format["acodec"] != "none"
+    # Accept formats that have either:
+    # 1. Both video and audio
+    # 2. Just video (we'll merge with audio)
+    has_video = format["vcodec"] != "none"
+    has_audio = format["acodec"] != "none"
+
+    # Include if it has video (with or without audio)
+    has_video
   end
 
   defp format_info(format) do
     type =
       cond do
         format["vcodec"] != "none" && format["acodec"] != "none" -> "Video"
-        format["vcodec"] != "none" -> "Video (no audio)"
+        format["vcodec"] != "none" -> "Video"
         format["acodec"] != "none" -> "Audio only"
       end
 
@@ -221,27 +243,25 @@ defmodule Ytd.VideoProcessor do
   end
 
   defp select_best_formats(formats) do
-    video_formats = Enum.filter(formats, &(&1.type == "Video"))
+    # Get all video formats
+    video_formats =
+      formats
+      |> Enum.filter(&(&1.type == "Video"))
+      |> Enum.sort_by(&(&1.quality_index), :desc)
+
+    # Get the best audio format
     audio_formats = Enum.filter(formats, &(&1.type == "Audio only"))
-
-    # Select highest, middle, and lowest quality video formats
-    selected_videos =
-      case video_formats do
-        [] -> []
-        [single] -> [single]
-        videos ->
-          [
-            Enum.at(videos, 0),
-            Enum.at(videos, div(length(videos), 2)),
-            Enum.at(videos, -1)
-          ]
-      end
-
-    # Select best audio format
     best_audio = List.first(audio_formats)
 
-    (selected_videos ++ [best_audio])
-    |> Enum.reject(&is_nil/1)
+    # Get the best video format
+    best_video = List.first(video_formats)
+
+    case {best_video, best_audio} do
+      {nil, nil} -> []
+      {nil, audio} -> [audio]
+      {video, nil} -> [video]
+      {video, audio} -> [video, audio]
+    end
   end
 
   defp format_size(bytes) when bytes > 1_000_000_000 do

@@ -127,11 +127,12 @@ defmodule YtdWeb.HomeLive do
 
           <%= if @download_path do %>
             <div class="mt-4">
-              <a href={"/downloads/#{Path.basename(@download_path)}"}
-                 download
-                 class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                Save File
-              </a>
+              <.link
+          href={~p"/downloads/#{@download_path}"}
+          class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        >
+          Save File
+        </.link>
             </div>
           <% end %>
         </div>
@@ -209,9 +210,11 @@ defmodule YtdWeb.HomeLive do
   @impl true
   def handle_info({:download_complete, path}, socket) do
     Logger.info("Download complete: #{path}")
+    filename = Path.basename(path) # This will now be the actual filename without format_id
+
     {:noreply,
      socket
-     |> assign(downloading: false, download_progress: 100, download_path: path)
+     |> assign(downloading: false, download_progress: 100, download_path: filename)
      |> put_flash(:info, "Download completed successfully!")}
   end
 
