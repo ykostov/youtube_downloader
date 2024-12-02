@@ -2,8 +2,8 @@ defmodule YtdWeb.DownloadController do
   use YtdWeb, :controller
 
   def download(conn, %{"filename" => filename}) do
-    download_path = Path.join(System.tmp_dir!(), "youtube_download")
-    file_path = Path.join(download_path, filename)
+    downloads_dir = Path.join(System.tmp_dir!(), "ytd_downloads")
+    file_path = Path.join(downloads_dir, filename)
 
     if File.exists?(file_path) do
       conn

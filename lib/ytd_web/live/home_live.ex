@@ -6,6 +6,9 @@ defmodule YtdWeb.HomeLive do
 
   @impl true
   def mount(_params, _session, socket) do
+     # Create a temporary downloads directory if it doesn't exist
+     downloads_dir = Path.join(System.tmp_dir!(), "ytd_downloads")
+     File.mkdir_p!(downloads_dir)
     {:ok,
      assign(socket,
        url: "",
@@ -15,7 +18,8 @@ defmodule YtdWeb.HomeLive do
        selected_format: nil,
        download_progress: 0,
        download_path: nil,
-       show_directory_picker: false
+       show_directory_picker: false,
+       downloads_dir: downloads_dir
      )}
   end
 
@@ -29,6 +33,7 @@ defmodule YtdWeb.HomeLive do
         </h1>
 
         <div class="bg-white shadow rounded-lg p-6">
+          <!-- URL input form remains the same -->
           <form phx-submit="fetch_formats" class="space-y-4">
             <div>
               <label for="url" class="block text-sm font-medium text-gray-700">
@@ -59,15 +64,6 @@ defmodule YtdWeb.HomeLive do
           <%= if @error do %>
             <div class="mt-4 bg-red-50 border-l-4 border-red-400 p-4">
               <div class="flex">
-                <div class="flex-shrink-0">
-                  <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path
-                      fill-rule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                      clip-rule="evenodd"
-                    />
-                  </svg>
-                </div>
                 <div class="ml-3">
                   <p class="text-sm text-red-700"><%= @error %></p>
                 </div>
@@ -81,8 +77,9 @@ defmodule YtdWeb.HomeLive do
               <%= for format <- @formats do %>
                 <div class="border rounded-lg p-4 hover:bg-gray-50">
                   <button
-                    phx-click="choose_location"
+                    phx-click="select_format"
                     phx-value-id={format.id}
+                    phx-value-ext={format.ext}
                     class="w-full text-left"
                   >
                     <div class="flex justify-between items-center">
@@ -129,67 +126,17 @@ defmodule YtdWeb.HomeLive do
           <% end %>
 
           <%= if @download_path do %>
-            <div class="mt-4 bg-green-50 border-l-4 border-green-400 p-4">
-              <div class="flex">
-                <div class="ml-3">
-                  <p class="text-sm text-green-700">Download completed! File saved at:</p>
-                  <p class="text-sm font-mono mt-1"><%= @download_path %></p>
-                  <button
-                    phx-click="open_directory"
-                    class="mt-2 inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-green-700 bg-green-100 hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                  >
-                    Open Directory
-                  </button>
-                </div>
-              </div>
+            <div class="mt-4">
+              <a href={"/downloads/#{Path.basename(@download_path)}"}
+                 download
+                 class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                Save File
+              </a>
             </div>
           <% end %>
         </div>
       </div>
     </div>
-
-    <%= if @show_directory_picker do %>
-      <div class="fixed z-10 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-          <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
-          <div class="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
-            <div>
-              <div class="mt-3 text-center sm:mt-5">
-                <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
-                  Choose Download Location
-                </h3>
-                <div class="mt-2">
-                  <form phx-submit="start_download" class="space-y-4">
-                    <input type="hidden" name="format_id" value={@selected_format} />
-                    <div>
-                      <label for="directory" class="block text-sm font-medium text-gray-700">
-                        Download Directory
-                      </label>
-                      <div class="mt-1">
-                        <input
-                          type="text"
-                          name="directory"
-                          id="directory"
-                          class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                          value={System.user_home!()}
-                          required
-                        />
-                      </div>
-                    </div>
-                    <button
-                      type="submit"
-                      class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm"
-                    >
-                      Start Download
-                    </button>
-                  </form>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    <% end %>
     """
   end
 
@@ -241,9 +188,16 @@ defmodule YtdWeb.HomeLive do
 
   @impl true
   def handle_event("select_format", %{"id" => format_id}, socket) do
-    # Start download process
-    VideoProcessor.start_download(socket.assigns.url, format_id)
+    VideoProcessor.start_download(socket.assigns.url, format_id, socket.assigns.downloads_dir)
     {:noreply, assign(socket, downloading: true, selected_format: format_id)}
+  end
+
+
+  @impl true
+  def handle_event("directory_selected", %{"directory" => directory}, socket) do
+    Logger.info("Starting download for format: #{socket.assigns.selected_format} to directory: #{directory}")
+    VideoProcessor.start_download(socket.assigns.url, socket.assigns.selected_format, directory)
+    {:noreply, assign(socket, downloading: true, download_progress: 0, show_directory_picker: false)}
   end
 
   @impl true
