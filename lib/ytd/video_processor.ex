@@ -53,24 +53,7 @@ defmodule Ytd.VideoProcessor do
     File.mkdir_p!(download_dir)
 
     Task.start(fn ->
-      # try do
-      #   port = Porcelain.spawn(@youtube_dl_cmd, [
-      #     "-f",
-      #     format_id,
-      #     "-o",
-      #     Path.join(download_dir, "%(title)s.%(ext)s"),
-      #     "--newline",
-      #     "--progress",
-      #     url
-      #   ], out: {:send, self()})
-
-      #   monitor_download(port, pid, download_id, download_dir)
-      # catch
-      #   kind, error ->
-      #     Logger.error("Download failed: #{inspect(kind)} - #{inspect(error)}")
-      #     send(pid, {:download_error, "Download failed: Please try again"})
-      # end
-
+      try do
         port = Porcelain.spawn(@youtube_dl_cmd, [
           "-f",
           format_id,
@@ -82,6 +65,11 @@ defmodule Ytd.VideoProcessor do
         ], out: {:send, self()})
 
         monitor_download(port, pid, download_id, download_dir)
+      catch
+        kind, error ->
+          Logger.error("Download failed: #{inspect(kind)} - #{inspect(error)}")
+          send(pid, {:download_error, "Download failed: Please try again"})
+      end
 
     end)
 
