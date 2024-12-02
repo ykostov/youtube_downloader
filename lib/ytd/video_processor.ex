@@ -2,6 +2,8 @@ defmodule Ytd.VideoProcessor do
   use GenServer
   require Logger
 
+  alias Ytd.TransliterateHelper
+
   @youtube_dl_cmd "yt-dlp"
 
   # Client API
@@ -50,47 +52,29 @@ defmodule Ytd.VideoProcessor do
 
     Task.start(fn ->
       try do
-        # Determine if this is an audio-only download
-        format_info =
-          case System.cmd(@youtube_dl_cmd, ["--dump-json", url]) do
-            {output, 0} ->
-              formats =
-                output
-                |> Jason.decode!()
-                |> Map.get("formats")
-                |> process_formats()
+        format_arg = if String.contains?(format_id, "+bestaudio"), do: format_id, else: "#{format_id}+bestaudio"
 
-              Enum.find(formats, &(&1.id == format_id))
-          end
+        # Get video title and transliterate it
+        {title_output, 0} = System.cmd(@youtube_dl_cmd, ["--print", "title", url])
+        safe_title = title_output
+                    |> String.trim()
+                    |> transliterate()
+                    |> String.replace(~r/[^a-zA-Z0-9\s-]/, "")  # Remove any remaining special chars
+                    |> String.replace(~r/\s+/, "-")             # Replace spaces with hyphens
 
-        args = if format_info && format_info.is_audio do
-          [
-            "-f",
-            format_id,
-            "-o",
-            Path.join(download_dir, "%(title)s.%(ext)s"),
-            "--newline",
-            "--progress",
-            "--extract-audio",
-            "--audio-format", "mp3",
-            "--audio-quality", "0",  # Best quality
-            url
-          ]
-        else
-          format_arg = if String.contains?(format_id, "+bestaudio"), do: format_id, else: "#{format_id}+bestaudio"
-          [
-            "-f",
-            format_arg,
-            "-o",
-            Path.join(download_dir, "%(title)s.mp4"),
-            "--newline",
-            "--progress",
-            "--merge-output-format", "mp4",
-            url
-          ]
-        end
+        output_template = Path.join(download_dir, "#{safe_title}.%(ext)s")
 
-        port = Porcelain.spawn(@youtube_dl_cmd, args, out: {:send, self()})
+        port = Porcelain.spawn(@youtube_dl_cmd, [
+          "-f",
+          format_arg,
+          "-o",
+          output_template,
+          "--newline",
+          "--progress",
+          "--merge-output-format", "mp4",
+          url
+        ], out: {:send, self()})
+
         monitor_download(port, pid, download_id, download_dir)
       catch
         kind, error ->
@@ -110,6 +94,16 @@ defmodule Ytd.VideoProcessor do
 
     {:noreply, %{state | downloads: new_downloads}}
   end
+
+  # Transliteration function for Cyrillic
+  defp transliterate(text) do
+    text
+    |> String.graphemes()
+    |> Enum.map(&TransliterateHelper.transliterate_char/1)
+    |> Enum.join()
+  end
+
+
 
 
   @impl true
