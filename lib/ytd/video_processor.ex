@@ -54,20 +54,47 @@ defmodule Ytd.VideoProcessor do
 
     Task.start(fn ->
       try do
-        format_arg = if String.contains?(format_id, "+bestaudio"), do: format_id, else: "#{format_id}+bestaudio"
-        output_template = Path.join(download_dir, "%(title)s.mp4") # Force .mp4 extension
+        # Determine if this is an audio-only download
+        format_info =
+          case System.cmd(@youtube_dl_cmd, ["--dump-json", url]) do
+            {output, 0} ->
+              formats =
+                output
+                |> Jason.decode!()
+                |> Map.get("formats")
+                |> process_formats()
 
-        port = Porcelain.spawn(@youtube_dl_cmd, [
-          "-f",
-          format_arg,
-          "-o",
-          output_template,
-          "--newline",
-          "--progress",
-          "--merge-output-format", "mp4",
-          url
-        ], out: {:send, self()})
+              Enum.find(formats, &(&1.id == format_id))
+          end
 
+        args = if format_info && format_info.is_audio do
+          [
+            "-f",
+            format_id,
+            "-o",
+            Path.join(download_dir, "%(title)s.%(ext)s"),
+            "--newline",
+            "--progress",
+            "--extract-audio",
+            "--audio-format", "mp3",
+            "--audio-quality", "0",  # Best quality
+            url
+          ]
+        else
+          format_arg = if String.contains?(format_id, "+bestaudio"), do: format_id, else: "#{format_id}+bestaudio"
+          [
+            "-f",
+            format_arg,
+            "-o",
+            Path.join(download_dir, "%(title)s.mp4"),
+            "--newline",
+            "--progress",
+            "--merge-output-format", "mp4",
+            url
+          ]
+        end
+
+        port = Porcelain.spawn(@youtube_dl_cmd, args, out: {:send, self()})
         monitor_download(port, pid, download_id, download_dir)
       catch
         kind, error ->
@@ -202,14 +229,11 @@ defmodule Ytd.VideoProcessor do
   end
 
   defp filter_format(format) do
-    # Accept formats that have either:
-    # 1. Both video and audio
-    # 2. Just video (we'll merge with audio)
     has_video = format["vcodec"] != "none"
     has_audio = format["acodec"] != "none"
 
-    # Include if it has video (with or without audio)
-    has_video
+    # Include if it has video or if it's an audio format
+    has_video || has_audio
   end
 
   defp format_info(format) do
@@ -217,18 +241,18 @@ defmodule Ytd.VideoProcessor do
       cond do
         format["vcodec"] != "none" && format["acodec"] != "none" -> "Video"
         format["vcodec"] != "none" -> "Video"
-        format["acodec"] != "none" -> "Audio only"
+        format["acodec"] != "none" -> "Audio MP3"  # Changed label
       end
 
     quality =
       case type do
-        "Audio only" -> "#{format["abr"]}kbps"
+        "Audio MP3" -> "#{format["abr"]}kbps"
         _ -> "#{format["height"]}p"
       end
 
     quality_index =
       case type do
-        "Audio only" -> format["abr"] || 0
+        "Audio MP3" -> format["abr"] || 0
         _ -> format["height"] || 0
       end
 
@@ -238,7 +262,8 @@ defmodule Ytd.VideoProcessor do
       quality: quality,
       quality_index: quality_index,
       size: format_size(format["filesize"] || 0),
-      ext: format["ext"] || "mp4"
+      ext: "mp3",  # Force mp3 for audio
+      is_audio: type == "Audio MP3"  # Add flag for audio
     }
   end
 
@@ -249,19 +274,18 @@ defmodule Ytd.VideoProcessor do
       |> Enum.filter(&(&1.type == "Video"))
       |> Enum.sort_by(&(&1.quality_index), :desc)
 
-    # Get the best audio format
-    audio_formats = Enum.filter(formats, &(&1.type == "Audio only"))
+    # Get audio formats
+    audio_formats =
+      formats
+      |> Enum.filter(&(&1.type == "Audio MP3"))
+      |> Enum.sort_by(&(&1.quality_index), :desc)
+
+    # Get the best video and audio formats
+    best_video = List.first(video_formats)
     best_audio = List.first(audio_formats)
 
-    # Get the best video format
-    best_video = List.first(video_formats)
-
-    case {best_video, best_audio} do
-      {nil, nil} -> []
-      {nil, audio} -> [audio]
-      {video, nil} -> [video]
-      {video, audio} -> [video, audio]
-    end
+    [best_video, best_audio]
+    |> Enum.reject(&is_nil/1)
   end
 
   defp format_size(bytes) when bytes > 1_000_000_000 do
