@@ -136,40 +136,57 @@ defmodule Ytd.VideoProcessor do
   defp monitor_download(port, client_pid, download_id, download_dir) do
     receive do
       {_, :data, :out, data} ->
-        case parse_progress(data) do
-          {:ok, progress} ->
-            send(client_pid, {:download_progress, progress})
-            monitor_download(port, client_pid, download_id, download_dir)
+        cond do
+          String.contains?(data, "Destination:") ->
+            filename = data
+              |> String.split("Destination: ")
+              |> List.last()
+              |> String.trim()
+              |> Path.basename()
+            monitor_download(port, client_pid, download_id, download_dir, filename)
 
-          :complete ->
-            case find_latest_download(download_dir) do
-              nil ->
-                send(client_pid, {:download_error, "Could not find downloaded file"})
-              filepath ->
-                # Here's where we ensure we get just the final filename
-                filename = Path.basename(filepath)
-                send(client_pid, {:download_complete, filename})
-            end
-
-          _ ->
+          true ->
             monitor_download(port, client_pid, download_id, download_dir)
         end
 
       {_, :result, %{status: 0}} ->
-        case find_latest_download(download_dir) do
-          nil ->
-            send(client_pid, {:download_error, "Could not find downloaded file"})
-          filepath ->
-            filename = Path.basename(filepath)
+        Logger.error("Download ended without capturing filename")
+        send(client_pid, {:download_error, "Could not determine downloaded file"})
+
+      {_, :result, %{status: status}} ->
+        send(client_pid, {:download_error, "Download failed with status #{status}"})
+
+      other ->
+        Logger.debug("Unexpected message in initial monitor_download: #{inspect(other)}")
+        monitor_download(port, client_pid, download_id, download_dir)
+    end
+  end
+
+  # Main monitoring loop after filename is captured
+  defp monitor_download(port, client_pid, download_id, download_dir, filename) do
+    receive do
+      {_, :data, :out, data} ->
+        case parse_progress(data) do
+          {:ok, progress} ->
+            send(client_pid, {:download_progress, progress})
+            monitor_download(port, client_pid, download_id, download_dir, filename)
+
+          :complete ->
             send(client_pid, {:download_complete, filename})
+
+          _ ->
+            monitor_download(port, client_pid, download_id, download_dir, filename)
         end
+
+      {_, :result, %{status: 0}} ->
+        send(client_pid, {:download_complete, filename})
 
       {_, :result, %{status: status}} ->
         send(client_pid, {:download_error, "Download failed with status #{status}"})
 
       other ->
         Logger.debug("Unexpected message in monitor_download: #{inspect(other)}")
-        monitor_download(port, client_pid, download_id, download_dir)
+        monitor_download(port, client_pid, download_id, download_dir, filename)
     end
   end
 
