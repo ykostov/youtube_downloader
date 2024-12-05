@@ -62,7 +62,11 @@ defmodule Ytd.VideoProcessor do
                     |> String.replace(~r/[^a-zA-Z0-9\s-]/, "")  # Remove any remaining special chars
                     |> String.replace(~r/\s+/, "-")             # Replace spaces with hyphens
 
-        output_template = Path.join(download_dir, "#{safe_title}.%(ext)s")
+        # Add quality suffix from format metadata
+        output_template = Path.join(
+          download_dir,
+          "#{safe_title}-%(height)sp.%(ext)s"  # yt-dlp will replace %(height)s with the actual resolution
+        )
 
         port = Porcelain.spawn(@youtube_dl_cmd, [
           "-f",
@@ -285,17 +289,31 @@ defmodule Ytd.VideoProcessor do
       |> Enum.filter(&(&1.type == "Video"))
       |> Enum.sort_by(&(&1.quality_index), :desc)
 
+    # Get 1080p format if it exists
+    format_1080p = Enum.find(video_formats, &(&1.quality_index == 1080))
+
+    # Get the best video format
+    best_video = List.first(video_formats)
+
     # Get audio formats
     audio_formats =
       formats
       |> Enum.filter(&(&1.type == "Audio MP3"))
       |> Enum.sort_by(&(&1.quality_index), :desc)
 
-    # Get the best video and audio formats
-    best_video = List.first(video_formats)
+    # Get the best audio format
     best_audio = List.first(audio_formats)
 
-    [best_video, best_audio]
+    # If best video is higher than 1080p and 1080p exists, include both
+    video_formats_to_include =
+      if best_video && format_1080p && best_video.quality_index > 1080 do
+        [best_video, format_1080p]
+      else
+        [best_video]
+      end
+
+    # Combine with best audio and remove nils
+    (video_formats_to_include ++ [best_audio])
     |> Enum.reject(&is_nil/1)
   end
 
