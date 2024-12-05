@@ -551,6 +551,7 @@ defmodule YtdWeb.HomeLive do
     * :ok if valid
     * {:error, message} if invalid
   """
+
   defp validate_youtube_url(url) do
     cond do
       String.match?(url, ~r/^https?:\/\/(www\.)?(youtube\.com|youtu\.be)/) ->
