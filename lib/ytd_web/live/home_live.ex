@@ -1,11 +1,18 @@
 defmodule YtdWeb.HomeLive do
   use YtdWeb, :live_view
   alias Ytd.VideoProcessor
+  alias Ytd.Tracking.PageView
 
   require Logger
 
   @impl true
   def mount(_params, _session, socket) do
+    if connected?(socket) do
+      :timer.send_interval(1000, :update_page_views)
+    end
+
+    # Initial count
+    count = PageView.get_count("home")
      # Create a temporary downloads directory if it doesn't exist
      downloads_dir = Path.join(System.tmp_dir!(), "ytd_downloads")
      File.mkdir_p!(downloads_dir)
@@ -20,7 +27,8 @@ defmodule YtdWeb.HomeLive do
        download_path: nil,
        show_directory_picker: false,
        downloads_dir: downloads_dir,
-       loading_formats: false
+       loading_formats: false,
+       page_views: count
      )}
   end
 
@@ -195,6 +203,21 @@ defmodule YtdWeb.HomeLive do
       </div>
     </div>
     """
+  end
+
+  @impl true
+  def handle_info(:update_page_views, socket) do
+    count = PageView.get_count("home")
+    {:noreply, assign(socket, page_views: count)}
+  end
+
+  # Add this to handle initial page load
+  @impl true
+  def handle_params(_, _, socket) do
+    if connected?(socket) do
+      PageView.increment("home")
+    end
+    {:noreply, socket}
   end
 
   @impl true
