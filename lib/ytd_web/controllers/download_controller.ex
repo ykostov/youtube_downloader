@@ -1,7 +1,35 @@
 defmodule YtdWeb.DownloadController do
+  @moduledoc """
+  Controller responsible for handling file downloads in the YouTube downloader application.
+  Manages serving video and audio files from the temporary downloads directory.
+  """
   use YtdWeb, :controller
   require Logger
 
+  @doc """
+  Handles file download requests.
+  Attempts to find and serve the requested file, with fallback to alternative filenames.
+  Includes logging for debugging download issues.
+
+  ## Parameters
+    * conn - The connection struct
+    * %{"filename" => filename} - Map containing the requested filename
+
+  ## Returns
+    * conn - Modified connection sending either:
+      - 200 status with file stream if found
+      - 404 status with error message if file not found
+
+  ## Examples
+    First tries to find exact filename match.
+    If not found, attempts to find file without format ID.
+    Logs detailed debugging information about file search process.
+
+  ## File Search Logic
+    1. Looks for exact match in downloads directory
+    2. If not found, tries alternative filename (base name + .mp4)
+    3. Returns 404 if neither exists
+  """
   def download(conn, %{"filename" => filename}) do
     downloads_dir = Path.join(System.tmp_dir!(), "ytd_downloads")
     file_path = Path.join(downloads_dir, filename)
@@ -18,10 +46,11 @@ defmodule YtdWeb.DownloadController do
 
       false ->
         # Try to find the file without the format ID if it's present
-        base_filename = filename
-                       |> String.split(".")
-                       |> List.first()
-                       |> Kernel.<>(".mp4")
+        base_filename =
+          filename
+          |> String.split(".")
+          |> List.first()
+          |> Kernel.<>(".mp4")
 
         alternative_path = Path.join(downloads_dir, base_filename)
 

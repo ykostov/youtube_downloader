@@ -1,10 +1,28 @@
 defmodule YtdWeb.HomeLive do
+  @moduledoc """
+  LiveView module for the home page of the YouTube downloader application.
+  Handles real-time interaction for video downloads and page view tracking.
+  Provides functionality for URL input, format selection, download progress,
+  and view count display.
+  """
   use YtdWeb, :live_view
   alias Ytd.VideoProcessor
   alias Ytd.Tracking.PageView
 
   require Logger
 
+  @doc """
+  Initializes the LiveView socket with default values and starts page view tracking.
+  Sets up periodic updates for view count and prepares download directory.
+
+  ## Parameters
+    * _params - URL parameters (unused)
+    * _session - Session data (unused)
+    * socket - The LiveView socket
+
+  ## Returns
+    * {:ok, socket} tuple with initialized assigns
+  """
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket) do
@@ -13,9 +31,10 @@ defmodule YtdWeb.HomeLive do
 
     # Initial count
     count = PageView.get_count("home")
-     # Create a temporary downloads directory if it doesn't exist
-     downloads_dir = Path.join(System.tmp_dir!(), "ytd_downloads")
-     File.mkdir_p!(downloads_dir)
+    # Create a temporary downloads directory if it doesn't exist
+    downloads_dir = Path.join(System.tmp_dir!(), "ytd_downloads")
+    File.mkdir_p!(downloads_dir)
+
     {:ok,
      assign(socket,
        url: "",
@@ -31,6 +50,18 @@ defmodule YtdWeb.HomeLive do
        page_views: count
      )}
   end
+
+  @doc """
+  Renders the LiveView template with the current socket assigns.
+  Displays the main interface including URL input, format selection,
+  download progress, and page view counter.
+
+  ## Parameters
+    * assigns - The socket assigns containing the current state
+
+  ## Returns
+    * HEEx template render result
+  """
 
   @impl true
   def render(assigns) do
@@ -68,9 +99,27 @@ defmodule YtdWeb.HomeLive do
             >
               <%= if @loading_formats do %>
                 <div class="flex items-center">
-                  <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  <svg
+                    class="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      class="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      stroke-width="4"
+                    >
+                    </circle>
+                    <path
+                      class="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    >
+                    </path>
                   </svg>
                   Fetching formats...
                 </div>
@@ -138,12 +187,32 @@ defmodule YtdWeb.HomeLive do
                         <div>
                           <div class="flex items-center">
                             <%= if format.is_audio do %>
-                              <svg class="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                              <svg
+                                class="w-5 h-5 mr-2 text-gray-500"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  stroke-width="2"
+                                  d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+                                />
                               </svg>
                             <% else %>
-                              <svg class="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              <svg
+                                class="w-5 h-5 mr-2 text-gray-500"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  stroke-width="2"
+                                  d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                                />
                               </svg>
                             <% end %>
                             <p class="font-medium text-gray-900">
@@ -192,11 +261,11 @@ defmodule YtdWeb.HomeLive do
           <%= if @download_path do %>
             <div class="mt-4">
               <.link
-          href={~p"/downloads/#{@download_path}"}
-          class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-        >
-          Save File
-        </.link>
+                href={~p"/downloads/#{@download_path}"}
+                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                Save File
+              </.link>
             </div>
           <% end %>
         </div>
@@ -205,18 +274,40 @@ defmodule YtdWeb.HomeLive do
     """
   end
 
+  @doc """
+  Handles real-time updates of the page view counter.
+  Called every second by the timer established in mount.
+
+  ## Parameters
+    * socket - The LiveView socket
+
+  ## Returns
+    * {:noreply, socket} tuple with updated page_views assign
+  """
   @impl true
   def handle_info(:update_page_views, socket) do
     count = PageView.get_count("home")
     {:noreply, assign(socket, page_views: count)}
   end
 
-  # Add this to handle initial page load
+  @doc """
+  Handles initial page load and LiveView connections.
+  Increments the page view counter when a new client connects.
+
+  ## Parameters
+    * _ - URL parameters (unused)
+    * _ - URL query string (unused)
+    * socket - The LiveView socket
+
+  ## Returns
+    * {:noreply, socket} tuple
+  """
   @impl true
   def handle_params(_, _, socket) do
     if connected?(socket) do
       PageView.increment("home")
     end
+
     {:noreply, socket}
   end
 
@@ -226,16 +317,23 @@ defmodule YtdWeb.HomeLive do
   end
 
   @impl true
-  def handle_event("start_download", %{"format_id" => format_id, "directory" => directory}, socket) do
+  def handle_event(
+        "start_download",
+        %{"format_id" => format_id, "directory" => directory},
+        socket
+      ) do
     Logger.info("Starting download for format: #{format_id} to directory: #{directory}")
     VideoProcessor.start_download(socket.assigns.url, format_id, directory)
-    {:noreply, assign(socket, downloading: true, download_progress: 0, show_directory_picker: false)}
+
+    {:noreply,
+     assign(socket, downloading: true, download_progress: 0, show_directory_picker: false)}
   end
 
   @impl true
   def handle_event("open_directory", _, socket) do
     if socket.assigns.download_path do
       directory = Path.dirname(socket.assigns.download_path)
+
       case :os.type() do
         {:unix, :linux} -> System.cmd("xdg-open", [directory])
         {:unix, :darwin} -> System.cmd("open", [directory])
@@ -246,6 +344,17 @@ defmodule YtdWeb.HomeLive do
     {:noreply, socket}
   end
 
+  @doc """
+  Handles user input event for URL validation.
+  Validates the provided URL format and updates error state accordingly.
+
+  ## Parameters
+    * %{"value" => url} - Map containing the URL value
+    * socket - The LiveView socket
+
+  ## Returns
+    * {:noreply, socket} tuple with updated url and error assigns
+  """
   @impl true
   def handle_event("validate_url", %{"value" => url}, socket) do
     # Basic URL validation
@@ -255,65 +364,154 @@ defmodule YtdWeb.HomeLive do
     end
   end
 
+  @doc """
+  Handles the fetch formats button click.
+  Resets previous download states and initiates format fetching for the new URL.
+
+  ## Parameters
+    * %{"url" => url} - Map containing the URL to fetch formats for
+    * socket - The LiveView socket
+
+  ## Returns
+    * {:noreply, socket} tuple with loading state and reset download states
+  """
   @impl true
-def handle_event("fetch_formats", %{"url" => url}, socket) do
-  # Set loading state
-  socket = assign(socket, loading_formats: true, formats: nil, error: nil, downloading: false, download_progress: 0, download_path: nil)
+  def handle_event("fetch_formats", %{"url" => url}, socket) do
+    # Set loading state
+    socket =
+      assign(socket,
+        loading_formats: true,
+        formats: nil,
+        error: nil,
+        downloading: false,
+        download_progress: 0,
+        download_path: nil
+      )
 
-  # Start async task for fetching
-  Process.send_after(self(), {:fetch_formats, url}, 0)
+    # Start async task for fetching
+    Process.send_after(self(), {:fetch_formats, url}, 0)
 
-  # Return immediately with loading state
-  {:noreply, socket}
-end
-
-# Add handlers for the fetch process
-@impl true
-def handle_info({:fetch_formats, url}, socket) do
-  case VideoProcessor.get_formats(url) do
-    {:ok, formats} ->
-      {:noreply, assign(socket, formats: formats, error: nil, loading_formats: false)}
-
-    {:error, message} ->
-      {:noreply, assign(socket, error: message, formats: nil, loading_formats: false)}
-  end
-end
-
-  # Add this handler for the formats fetched message
-  @impl true
-  def handle_info({:formats_fetched, {:ok, formats}}, socket) do
-    {:noreply, assign(socket, formats: formats, error: nil, loading_formats: false)}
-  end
-
-  @impl true
-  def handle_info({:formats_fetched, {:error, message}}, socket) do
-    {:noreply, assign(socket, error: message, formats: nil, loading_formats: false)}
+    # Return immediately with loading state
+    {:noreply, socket}
   end
 
+  @doc """
+  Handles format selection event.
+  Initiates the download process for the selected format.
+
+  ## Parameters
+    * %{"id" => format_id} - Map containing the selected format ID
+    * socket - The LiveView socket
+
+  ## Returns
+    * {:noreply, socket} tuple with updated downloading state
+  """
   @impl true
   def handle_event("select_format", %{"id" => format_id}, socket) do
     VideoProcessor.start_download(socket.assigns.url, format_id, socket.assigns.downloads_dir)
     {:noreply, assign(socket, downloading: true, selected_format: format_id)}
   end
 
-
   @impl true
   def handle_event("directory_selected", %{"directory" => directory}, socket) do
-    Logger.info("Starting download for format: #{socket.assigns.selected_format} to directory: #{directory}")
+    Logger.info(
+      "Starting download for format: #{socket.assigns.selected_format} to directory: #{directory}"
+    )
+
     VideoProcessor.start_download(socket.assigns.url, socket.assigns.selected_format, directory)
-    {:noreply, assign(socket, downloading: true, download_progress: 0, show_directory_picker: false)}
+
+    {:noreply,
+     assign(socket, downloading: true, download_progress: 0, show_directory_picker: false)}
   end
 
+  @doc """
+  Handles the completion of format fetching.
+  Processes the received format information and updates the UI.
+
+  ## Parameters
+    * {:fetch_formats, url} - Tuple containing the URL
+    * socket - The LiveView socket
+
+  ## Returns
+    * {:noreply, socket} tuple with formats or error information
+  """
+  @impl true
+  def handle_info({:fetch_formats, url}, socket) do
+    case VideoProcessor.get_formats(url) do
+      {:ok, formats} ->
+        {:noreply, assign(socket, formats: formats, error: nil, loading_formats: false)}
+
+      {:error, message} ->
+        {:noreply, assign(socket, error: message, formats: nil, loading_formats: false)}
+    end
+  end
+
+  @doc """
+  Handles successful format fetch result.
+  Updates the UI with available download formats.
+
+  ## Parameters
+    * {:formats_fetched, {:ok, formats}} - Tuple containing successful format results
+    * socket - The LiveView socket
+
+  ## Returns
+    * {:noreply, socket} tuple with updated formats
+  """
+  @impl true
+  def handle_info({:formats_fetched, {:ok, formats}}, socket) do
+    {:noreply, assign(socket, formats: formats, error: nil, loading_formats: false)}
+  end
+
+  @doc """
+  Handles failed format fetch result.
+  Updates the UI with error information.
+
+  ## Parameters
+    * {:formats_fetched, {:error, message}} - Tuple containing error message
+    * socket - The LiveView socket
+
+  ## Returns
+    * {:noreply, socket} tuple with error message
+  """
+  @impl true
+  def handle_info({:formats_fetched, {:error, message}}, socket) do
+    {:noreply, assign(socket, error: message, formats: nil, loading_formats: false)}
+  end
+
+  @doc """
+  Handles download progress updates.
+  Updates the progress bar UI with current download percentage.
+
+  ## Parameters
+    * {:download_progress, progress} - Tuple containing progress percentage
+    * socket - The LiveView socket
+
+  ## Returns
+    * {:noreply, socket} tuple with updated progress
+  """
   @impl true
   def handle_info({:download_progress, progress}, socket) do
     Logger.debug("Download progress: #{progress}%")
     {:noreply, assign(socket, download_progress: progress)}
   end
 
+  @doc """
+  Handles download completion.
+  Updates UI with download completion state and file path.
+
+  ## Parameters
+    * {:download_complete, path} - Tuple containing the downloaded file path
+    * socket - The LiveView socket
+
+  ## Returns
+    * {:noreply, socket} tuple with completion state and file path
+  """
+
   @impl true
   def handle_info({:download_complete, path}, socket) do
     Logger.info("Download complete: #{path}")
-    filename = Path.basename(path) # This will now be the actual filename without format_id
+    # This will now be the actual filename without format_id
+    filename = Path.basename(path)
 
     {:noreply,
      socket
@@ -321,15 +519,38 @@ end
      |> put_flash(:info, "Download completed successfully!")}
   end
 
+  @doc """
+  Handles download errors.
+  Updates UI with error information when download fails.
+
+  ## Parameters
+    * {:download_error, message} - Tuple containing the error message
+    * socket - The LiveView socket
+
+  ## Returns
+    * {:noreply, socket} tuple with error state
+  """
   @impl true
   def handle_info({:download_error, message}, socket) do
     Logger.error("Download error: #{message}")
+
     {:noreply,
      socket
      |> assign(downloading: false)
      |> put_flash(:error, message)}
   end
 
+  """
+  Private helper function to validate YouTube URLs.
+  Checks if the provided URL matches YouTube's format.
+
+  ## Parameters
+    * url - String containing the URL to validate
+
+  ## Returns
+    * :ok if valid
+    * {:error, message} if invalid
+  """
   defp validate_youtube_url(url) do
     cond do
       String.match?(url, ~r/^https?:\/\/(www\.)?(youtube\.com|youtu\.be)/) ->
