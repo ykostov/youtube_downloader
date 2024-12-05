@@ -235,7 +235,7 @@ defmodule YtdWeb.HomeLive do
   @impl true
 def handle_event("fetch_formats", %{"url" => url}, socket) do
   # Set loading state
-  socket = assign(socket, loading_formats: true, formats: nil, error: nil)
+  socket = assign(socket, loading_formats: true, formats: nil, error: nil, downloading: false, download_progress: 0, download_path: nil)
 
   # Start async task for fetching
   Process.send_after(self(), {:fetch_formats, url}, 0)
