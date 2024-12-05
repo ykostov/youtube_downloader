@@ -10,6 +10,8 @@ defmodule Ytd.VideoProcessor do
   alias Ytd.TransliterateHelper
 
   @youtube_dl_cmd "yt-dlp"
+  # Add a module attribute for the cookies path
+  @cookies_path Path.join([File.cwd!(), "priv", "data", "cookies.txt"])
 
   @doc """
   Starts the VideoProcessor as a named GenServer.
@@ -93,7 +95,12 @@ defmodule Ytd.VideoProcessor do
   """
   @impl true
   def handle_call({:get_formats, url}, _from, state) do
-    case System.cmd(@youtube_dl_cmd, ["--dump-json", url]) do
+    case System.cmd(@youtube_dl_cmd, [
+           "--dump-json",
+           "--cookies",
+           @cookies_path,
+           url
+         ]) do
       {output, 0} ->
         video_json = Jason.decode!(output)
         formats = process_formats(video_json)
@@ -160,6 +167,8 @@ defmodule Ytd.VideoProcessor do
               format_arg,
               "-o",
               output_template,
+              "--cookies",
+              @cookies_path,
               "--newline",
               "--progress",
               "--merge-output-format",
