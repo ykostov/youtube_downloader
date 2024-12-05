@@ -26,13 +26,20 @@ defmodule YtdWeb.HomeLive do
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket) do
-      :timer.send_interval(1000, :update_page_views)
+      :timer.send_interval(10000, :update_page_views)
     end
+
+    # Create and clean downloads directory in project
+    downloads_dir = Path.join([File.cwd!(), "priv", "static", "downloads"])
+     # Clean directory if it exists, create if it doesn't
+  if File.exists?(downloads_dir) do
+    File.rm_rf!(downloads_dir)
+  end
+  File.mkdir_p!(downloads_dir)
 
     # Initial count
     count = PageView.get_count("home")
     # Create a temporary downloads directory if it doesn't exist
-    downloads_dir = Path.join(System.tmp_dir!(), "ytd_downloads")
     File.mkdir_p!(downloads_dir)
 
     {:ok,

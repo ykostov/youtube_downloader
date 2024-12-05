@@ -73,8 +73,8 @@ defmodule Ytd.VideoProcessor do
   """
   @impl true
   def init(_) do
-    download_path = Path.join(System.tmp_dir!(), "youtube_download")
-    File.mkdir_p!(download_path)
+    downloads_dir = Path.join([File.cwd!(), "priv", "static", "downloads"])
+    File.mkdir_p!(downloads_dir)
     {:ok, %{downloads: %{}}}
   end
 

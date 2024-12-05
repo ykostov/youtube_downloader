@@ -20,7 +20,8 @@ config :ytd, YtdWeb.Endpoint,
     layout: false
   ],
   pubsub_server: Ytd.PubSub,
-  live_view: [signing_salt: "sDML/isz"]
+  live_view: [signing_salt: "sDML/isz"],
+  static_paths: ~w(assets fonts images downloads)
 
 # Configures the mailer
 #

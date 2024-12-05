@@ -31,7 +31,7 @@ defmodule YtdWeb.DownloadController do
     3. Returns 404 if neither exists
   """
   def download(conn, %{"filename" => filename}) do
-    downloads_dir = Path.join(System.tmp_dir!(), "ytd_downloads")
+    downloads_dir = Path.join([File.cwd!(), "priv", "static", "downloads"])
     file_path = Path.join(downloads_dir, filename)
 
     Logger.debug("Looking for file: #{file_path}")
