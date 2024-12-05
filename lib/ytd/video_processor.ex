@@ -97,6 +97,7 @@ defmodule Ytd.VideoProcessor do
   def handle_call({:get_formats, url}, _from, state) do
     case System.cmd(@youtube_dl_cmd, [
            "--dump-json",
+           "--netrc",
            "--cookies",
            @cookies_path,
            url
@@ -167,6 +168,7 @@ defmodule Ytd.VideoProcessor do
               format_arg,
               "-o",
               output_template,
+              "-netrc",
               "--cookies",
               @cookies_path,
               "--newline",
