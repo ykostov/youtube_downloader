@@ -94,7 +94,14 @@ defmodule Ytd.VideoProcessor do
   """
   @impl true
   def handle_call({:get_formats, url}, _from, state) do
-    case System.cmd(@youtube_dl_cmd, ["--dump-json", "--cookies", @cookies_file, url]) do
+    case System.cmd(@youtube_dl_cmd, [
+      "--dump-json",
+      "--cookies", @cookies_file,
+      "--extractor-args", "youtube:player_client=android",  # Use android client
+      "--no-check-certificates",                           # Skip HTTPS certificate validation
+      "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      url
+    ]) do
       {output, 0} ->
         video_json = Jason.decode!(output)
         formats = process_formats(video_json)
@@ -128,15 +135,21 @@ defmodule Ytd.VideoProcessor do
 
     Task.start(fn ->
       try do
-        format_arg =
-          if String.contains?(format_id, "+bestaudio"),
-            do: format_id,
-            else: "#{format_id}+bestaudio"
+        # Instead of appending +bestaudio, we'll use specific format syntax
+        format_arg = if format_id =~ ~r/^\d+$/ do
+          # If format_id is just numbers, merge with best audio
+          "#{format_id}+bestaudio/best"
+        else
+          format_id
+        end
 
-        # Get video title and transliterate it
+        # Get video title with updated parameters
         {title_output, 0} = System.cmd(@youtube_dl_cmd, [
           "--print", "title",
           "--cookies", @cookies_file,
+          "--extractor-args", "youtube:player_client=android",
+          "--no-check-certificates",
+          "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
           url
         ])
 
@@ -144,32 +157,26 @@ defmodule Ytd.VideoProcessor do
           title_output
           |> String.trim()
           |> transliterate()
-          # Remove any remaining special chars
           |> String.replace(~r/[^a-zA-Z0-9\s-]/, "")
-          # Replace spaces with hyphens
           |> String.replace(~r/\s+/, "-")
 
-        # Add quality suffix from format metadata
-        output_template =
-          Path.join(
-            download_dir,
-            # yt-dlp will replace %(height)s with the actual resolution
-            "#{safe_title}-%(height)sp.%(ext)s"
-          )
+        output_template = Path.join(download_dir, "#{safe_title}-%(height)sp.%(ext)s")
 
         port =
           Porcelain.spawn(
             @youtube_dl_cmd,
             [
-              "-f",
-              format_arg,
+              "-f", format_arg,
               "--cookies", @cookies_file,
-              "-o",
-              output_template,
+              "--extractor-args", "youtube:player_client=android",
+              "--no-check-certificates",
+              "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+              "-o", output_template,
               "--newline",
               "--progress",
-              "--merge-output-format",
-              "mp4",
+              "--merge-output-format", "mp4",    # Ensure we're merging to mp4
+              "--audio-quality", "0",            # Best audio quality
+              "--audio-format", "aac",           # Use AAC audio codec
               url
             ],
             out: {:send, self()}
@@ -183,15 +190,14 @@ defmodule Ytd.VideoProcessor do
       end
     end)
 
-    new_downloads =
-      Map.put(state.downloads, download_id, %{
-        pid: pid,
-        status: :downloading,
-        progress: 0,
-        url: url,
-        format_id: format_id,
-        directory: download_dir
-      })
+    new_downloads = Map.put(state.downloads, download_id, %{
+      pid: pid,
+      status: :downloading,
+      progress: 0,
+      url: url,
+      format_id: format_id,
+      directory: download_dir
+    })
 
     {:noreply, %{state | downloads: new_downloads}}
   end
@@ -406,8 +412,8 @@ defmodule Ytd.VideoProcessor do
     has_video = format["vcodec"] != "none"
     has_audio = format["acodec"] != "none"
 
-    # Include if it has video or if it's an audio format
-    has_video || has_audio
+    # Include if it has video (we'll merge with best audio) or if it's an audio-only format
+    has_video || (has_audio && !has_video)
   end
 
   """
