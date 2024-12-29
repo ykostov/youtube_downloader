@@ -10,6 +10,7 @@ defmodule Ytd.VideoProcessor do
   alias Ytd.TransliterateHelper
 
   @youtube_dl_cmd "yt-dlp"
+  @cookies_file "/tmp/youtube.cookies"
 
   @doc """
   Starts the VideoProcessor as a named GenServer.
@@ -93,7 +94,7 @@ defmodule Ytd.VideoProcessor do
   """
   @impl true
   def handle_call({:get_formats, url}, _from, state) do
-    case System.cmd(@youtube_dl_cmd, ["--dump-json", url]) do
+    case System.cmd(@youtube_dl_cmd, ["--dump-json", "--cookies", @cookies_file, url]) do
       {output, 0} ->
         video_json = Jason.decode!(output)
         formats = process_formats(video_json)
@@ -133,7 +134,11 @@ defmodule Ytd.VideoProcessor do
             else: "#{format_id}+bestaudio"
 
         # Get video title and transliterate it
-        {title_output, 0} = System.cmd(@youtube_dl_cmd, ["--print", "title", url])
+        {title_output, 0} = System.cmd(@youtube_dl_cmd, [
+          "--print", "title",
+          "--cookies", @cookies_file,
+          url
+        ])
 
         safe_title =
           title_output
@@ -158,6 +163,7 @@ defmodule Ytd.VideoProcessor do
             [
               "-f",
               format_arg,
+              "--cookies", @cookies_file,
               "-o",
               output_template,
               "--newline",
