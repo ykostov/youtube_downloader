@@ -31,11 +31,12 @@ defmodule YtdWeb.HomeLive do
 
     # Create and clean downloads directory in project
     downloads_dir = Path.join([File.cwd!(), "priv", "static", "downloads"])
-     # Clean directory if it exists, create if it doesn't
-  if File.exists?(downloads_dir) do
-    File.rm_rf!(downloads_dir)
-  end
-  File.mkdir_p!(downloads_dir)
+    # Clean directory if it exists, create if it doesn't
+    if File.exists?(downloads_dir) do
+      File.rm_rf!(downloads_dir)
+    end
+
+    File.mkdir_p!(downloads_dir)
 
     # Initial count
     count = PageView.get_count("home")
